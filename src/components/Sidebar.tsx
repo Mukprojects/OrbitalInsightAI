@@ -1,10 +1,10 @@
 
 import { BarChart3, Boxes, Cloud, Compass, Globe, Layers, Moon, Satellite, Settings, Shield } from "lucide-react";
-import { useState } from "react";
 import { Button } from "./ui/button";
+import { useView } from "../contexts/ViewContext";
 
 const Sidebar = () => {
-  const [activeItem, setActiveItem] = useState("dashboard");
+  const { activeView, setActiveView } = useView();
 
   const menuItems = [
     {
@@ -65,21 +65,21 @@ const Sidebar = () => {
             key={item.id}
             variant="ghost"
             className={`justify-start ${
-              activeItem === item.id
+              activeView === item.id
                 ? "bg-space-blue text-space-accent"
                 : "hover:bg-space-blue/20"
             }`}
-            onClick={() => setActiveItem(item.id)}
+            onClick={() => setActiveView(item.id as any)}
           >
             {item.icon}
-            <span className="ml-2">{item.name}</span>
+            <span className="ml-2 font-space">{item.name}</span>
           </Button>
         ))}
 
         <div className="h-px bg-border/50 my-4"></div>
 
         <div className="p-2 mb-2">
-          <p className="text-xs text-muted-foreground">LAYERS</p>
+          <p className="text-xs text-muted-foreground font-space">LAYERS</p>
         </div>
 
         <div className="space-y-2">
@@ -110,7 +110,7 @@ const Sidebar = () => {
             className="justify-start w-full mb-2"
           >
             {item.icon}
-            <span className="ml-2">{item.name}</span>
+            <span className="ml-2 font-space">{item.name}</span>
           </Button>
         ))}
       </div>
