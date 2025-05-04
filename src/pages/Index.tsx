@@ -6,25 +6,24 @@ import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
 import StatusBar from "../components/StatusBar";
 import { ViewProvider } from "../contexts/ViewContext";
+import { ScrollArea } from "../components/ui/scroll-area";
 
 const Index = () => {
-  useEffect(() => {
-    document.body.classList.add("overflow-hidden");
-    return () => {
-      document.body.classList.remove("overflow-hidden");
-    };
-  }, []);
+  // We're removing the overflow-hidden from the body to allow proper scrolling
+  // Instead, we'll handle overflow within our components
 
   return (
     <ViewProvider>
-      <div className="flex flex-col h-screen w-full overflow-hidden bg-space-dark-blue text-foreground">
+      <div className="flex flex-col h-screen w-full bg-space-dark-blue text-foreground">
         <Toaster position="top-right" richColors closeButton />
         <Navbar />
         <div className="flex flex-1 overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-hidden bg-space-gradient">
-            <Dashboard />
-          </main>
+          <ScrollArea className="flex-1 h-full bg-space-gradient">
+            <main className="min-h-full">
+              <Dashboard />
+            </main>
+          </ScrollArea>
         </div>
         <StatusBar />
       </div>
