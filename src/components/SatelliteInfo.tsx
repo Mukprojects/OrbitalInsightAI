@@ -3,17 +3,10 @@ import { AlertCircle, CheckCircle, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { toast } from "sonner";
+import { SatelliteData } from "../utils/satelliteData";
 
 interface SatelliteInfoProps {
-  satellite: {
-    id: string;
-    name: string;
-    type: string;
-    altitude: number;
-    velocity: number;
-    inclination: number;
-    status: "active" | "inactive" | "warning";
-  } | null;
+  satellite: SatelliteData | null;
 }
 
 const SatelliteInfo = ({ satellite }: SatelliteInfoProps) => {
@@ -94,6 +87,17 @@ const SatelliteInfo = ({ satellite }: SatelliteInfoProps) => {
             <div>
               <div className="text-muted-foreground">Type</div>
               <div>{satellite.type}</div>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <div className="text-muted-foreground">Latitude</div>
+              <div>{satellite.latitude.toFixed(2)}°</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">Longitude</div>
+              <div>{satellite.longitude.toFixed(2)}°</div>
             </div>
           </div>
 

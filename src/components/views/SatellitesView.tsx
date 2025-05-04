@@ -4,74 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Satellite, Signal, ShieldAlert, BarChart } from "lucide-react";
 import Globe from "../Globe";
 import SatelliteInfo from "../SatelliteInfo";
+import { satelliteList, SatelliteData } from "../../utils/satelliteData";
 
 const SatellitesView = () => {
-  const [selectedSatellite, setSelectedSatellite] = useState<any>(null);
+  const [selectedSatellite, setSelectedSatellite] = useState<SatelliteData | null>(null);
   
-  const satelliteList = [
-    {
-      id: "sat-001",
-      name: "GlobalSat-1",
-      type: "Earth Observation",
-      altitude: 705,
-      velocity: 27600,
-      inclination: 98.2,
-      status: "active" as const,
-      mission: "Environmental monitoring",
-      owner: "Global Space Agency",
-      launchDate: "2022-05-14"
-    },
-    {
-      id: "sat-002",
-      name: "OceanMonitor-3",
-      type: "Weather",
-      altitude: 824,
-      velocity: 27100,
-      inclination: 35.6,
-      status: "active" as const,
-      mission: "Ocean temperature mapping",
-      owner: "Oceanic Research Institute",
-      launchDate: "2023-02-28"
-    },
-    {
-      id: "sat-003",
-      name: "CommRelay-7",
-      type: "Communications",
-      altitude: 780,
-      velocity: 27300,
-      inclination: 45.1,
-      status: "warning" as const,
-      mission: "Global internet coverage",
-      owner: "TechComm Systems",
-      launchDate: "2021-11-15"
-    },
-    {
-      id: "sat-004",
-      name: "DefenseSat-2",
-      type: "Military",
-      altitude: 410,
-      velocity: 28100,
-      inclination: 51.6,
-      status: "inactive" as const,
-      mission: "Surveillance",
-      owner: "Defense Network",
-      launchDate: "2020-07-22"
-    },
-    {
-      id: "sat-005",
-      name: "ScienceOrb-1",
-      type: "Scientific",
-      altitude: 620,
-      velocity: 27800,
-      inclination: 62.3,
-      status: "active" as const,
-      mission: "Atmospheric research",
-      owner: "International Space Coalition",
-      launchDate: "2023-08-10"
-    }
-  ];
-  
-  const handleSatelliteSelect = (satellite: any) => {
+  const handleSatelliteSelect = (satellite: SatelliteData) => {
     setSelectedSatellite(satellite);
   };
 
@@ -86,7 +24,10 @@ const SatellitesView = () => {
         <div className="col-span-12 lg:col-span-8 flex flex-col">
           {/* Map */}
           <div className="relative h-[500px] mb-4 rounded-lg overflow-hidden">
-            <Globe onSatelliteSelect={handleSatelliteSelect} />
+            <Globe 
+              onSatelliteSelect={handleSatelliteSelect} 
+              selectedSatelliteId={selectedSatellite?.id}
+            />
           </div>
           
           {/* Satellite list */}
@@ -124,6 +65,10 @@ const SatellitesView = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Inclination:</span>
                       <span>{sat.inclination}°</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Position:</span>
+                      <span>{sat.latitude.toFixed(1)}°, {sat.longitude.toFixed(1)}°</span>
                     </div>
                   </div>
                 </CardContent>

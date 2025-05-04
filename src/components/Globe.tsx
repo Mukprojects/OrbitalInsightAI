@@ -1,14 +1,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { satelliteList, latLongToVector3, SatelliteData } from "../utils/satelliteData";
 
 interface GlobeProps {
-  onSatelliteSelect: (satellite: any) => void;
+  onSatelliteSelect: (satellite: SatelliteData) => void;
+  selectedSatelliteId?: string;
 }
 
-const Globe = ({ onSatelliteSelect }: GlobeProps) => {
+const Globe = ({ onSatelliteSelect, selectedSatelliteId }: GlobeProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loaded, setLoaded] = useState(false);
+  const satelliteObjectsRef = useRef<{[id: string]: THREE.Object3D}>({});
   
   useEffect(() => {
     if (!containerRef.current) return;
@@ -180,24 +183,38 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
     const stars = new THREE.Points(starsGeometry, starsMaterial);
     scene.add(stars);
     
-    // Create sample satellites with better visuals
-    const satellites: THREE.Mesh[] = [];
-    const satelliteData = [
-      { color: 0x4CC9F0, radius: 0.02, distance: 1.3, speed: 0.005, inclination: 0.2, trailLength: 50 },
-      { color: 0x06D6A0, radius: 0.015, distance: 1.5, speed: 0.002, inclination: 0.5, trailLength: 50 },
-      { color: 0xFFD166, radius: 0.02, distance: 1.7, speed: 0.001, inclination: 0.1, trailLength: 50 },
-      { color: 0xFF6B6B, radius: 0.018, distance: 1.4, speed: 0.003, inclination: 0.8, trailLength: 50 }
-    ];
-    
-    // Create satellite trails
-    const trails: THREE.Line[] = [];
-    
-    satelliteData.forEach((data, index) => {
+    // Create real satellites from our data
+    const satellites: THREE.Object3D[] = [];
+    const satelliteObjects: {[id: string]: THREE.Object3D} = {};
+
+    // Color mapping for satellite types
+    const typeColorMap: Record<string, number> = {
+      "Earth Observation": 0x4CC9F0,
+      "Weather": 0x06D6A0,
+      "Communications": 0xFFD166,
+      "Military": 0xFF6B6B,
+      "Scientific": 0xAA96DA
+    };
+
+    // Status effect mapping
+    const statusEffectMap: Record<string, {opacity: number, pulseSpeed: number}> = {
+      "active": {opacity: 0.7, pulseSpeed: 0.5},
+      "warning": {opacity: 0.9, pulseSpeed: 2},
+      "inactive": {opacity: 0.3, pulseSpeed: 0.1}
+    };
+
+    // Create satellites based on real data
+    satelliteList.forEach((satData) => {
+      const color = typeColorMap[satData.type] || 0xFFFFFF;
+      
+      // Create a group to hold the satellite and its label
+      const satelliteGroup = new THREE.Group();
+
       // Create a more detailed satellite
-      const satelliteGeometry = new THREE.SphereGeometry(data.radius, 16, 16);
+      const satelliteGeometry = new THREE.SphereGeometry(0.02, 16, 16);
       const satelliteMaterial = new THREE.MeshPhongMaterial({
-        color: data.color,
-        emissive: data.color,
+        color: color,
+        emissive: color,
         emissiveIntensity: 0.5,
         shininess: 30
       });
@@ -205,65 +222,85 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
       const satellite = new THREE.Mesh(satelliteGeometry, satelliteMaterial);
       
       // Add a small glow around the satellite
-      const satelliteGlowGeometry = new THREE.SphereGeometry(data.radius * 1.5, 16, 16);
+      const satelliteGlowGeometry = new THREE.SphereGeometry(0.03, 16, 16);
       const satelliteGlowMaterial = new THREE.MeshBasicMaterial({
-        color: data.color,
+        color: color,
         transparent: true,
-        opacity: 0.3
+        opacity: statusEffectMap[satData.status]?.opacity || 0.5
       });
       const satelliteGlow = new THREE.Mesh(satelliteGlowGeometry, satelliteGlowMaterial);
       satellite.add(satelliteGlow);
       
-      // Create improved orbit with fade effect
+      // Add a ping effect for better visibility
+      const pingGeometry = new THREE.SphereGeometry(0.01, 16, 16);
+      const pingMaterial = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.6
+      });
+      const ping = new THREE.Mesh(pingGeometry, pingMaterial);
+      satellite.add(ping);
+      
+      // Add to group
+      satelliteGroup.add(satellite);
+      
+      // Add user data for raycasting identification
+      satelliteGroup.userData = { id: satData.id };
+      
+      // Calculate position from lat/long
+      const scaleFactor = satData.altitude / 2500; // Scale altitude for visual effect
+      const altitude = 0.05 + scaleFactor * 0.15;
+      const [x, y, z] = latLongToVector3(satData.latitude, satData.longitude, 1, altitude);
+      
+      satelliteGroup.position.set(x, y, z);
+      
+      // Create orbit based on inclination and altitude
       const orbitGeometry = new THREE.BufferGeometry();
       const orbitMaterial = new THREE.LineBasicMaterial({
-        color: data.color,
+        color: color,
         transparent: true,
-        opacity: 0.5
+        opacity: 0.2 + (statusEffectMap[satData.status]?.opacity || 0) * 0.3
       });
       
+      // Calculate orbit points based on satellite position and inclination
+      const orbitRadius = Math.sqrt(x*x + y*y + z*z);
       const orbitPoints = [];
       const segments = 128;
       
+      // Create orbit points in a circle that passes through the satellite position
+      const normalVector = new THREE.Vector3(x, y, z).normalize();
+      const rotationAxis = new THREE.Vector3(0, 1, 0).cross(normalVector).normalize();
+      
       for (let i = 0; i <= segments; i++) {
         const theta = (i / segments) * Math.PI * 2;
-        const x = data.distance * Math.cos(theta);
-        const z = data.distance * Math.sin(theta);
-        orbitPoints.push(new THREE.Vector3(x, 0, z));
+        
+        // Create a point on a circle
+        const tempVector = new THREE.Vector3(
+          orbitRadius * Math.cos(theta),
+          0,
+          orbitRadius * Math.sin(theta)
+        );
+        
+        // Rotate the circle to align with the satellite's position
+        tempVector.applyAxisAngle(rotationAxis, Math.acos(normalVector.y));
+        
+        orbitPoints.push(tempVector);
       }
       
       orbitGeometry.setFromPoints(orbitPoints);
       const orbit = new THREE.Line(orbitGeometry, orbitMaterial);
       
-      // Apply inclination
-      orbit.rotation.x = data.inclination;
-      
-      // Create satellite trail
-      const trailGeometry = new THREE.BufferGeometry();
-      const trailMaterial = new THREE.LineBasicMaterial({
-        color: data.color,
-        transparent: true,
-        opacity: 0.7
-      });
-      
-      // Initialize empty trail points
-      const trailPositions = new Float32Array(data.trailLength * 3);
-      trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
-      trailGeometry.setDrawRange(0, 0);
-      
-      const trail = new THREE.Line(trailGeometry, trailMaterial);
-      trails.push(trail);
+      // Apply inclination variation
+      orbit.rotation.x = (satData.inclination / 180) * Math.PI * 0.3;
       
       scene.add(orbit);
-      scene.add(satellite);
-      scene.add(trail);
-      satellites.push(satellite);
-      
-      // Set initial position
-      const initialAngle = Math.random() * Math.PI * 2;
-      satellite.position.x = data.distance * Math.cos(initialAngle);
-      satellite.position.z = data.distance * Math.sin(initialAngle);
+      scene.add(satelliteGroup);
+      satellites.push(satelliteGroup);
+      satelliteObjects[satData.id] = satelliteGroup;
     });
+    
+    // Store satellite objects reference
+    satelliteObjectsRef.current = satelliteObjects;
     
     // Handle click events for satellite selection
     const raycaster = new THREE.Raycaster();
@@ -275,61 +312,27 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       
       raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(satellites);
+      const intersects = raycaster.intersectObjects(satellites, true);
       
       if (intersects.length > 0) {
-        const index = satellites.indexOf(intersects[0].object as THREE.Mesh);
+        // Find the parent group
+        let obj: THREE.Object3D | null = intersects[0].object;
         
-        // Sample satellite data for UI
-        const mockSatellites = [
-          {
-            id: "sat-001",
-            name: "GlobalSat-1",
-            type: "Earth Observation",
-            altitude: 705,
-            velocity: 27600,
-            inclination: 98.2,
-            status: "active" as const
-          },
-          {
-            id: "sat-002",
-            name: "OceanMonitor-3",
-            type: "Weather",
-            altitude: 824,
-            velocity: 27100,
-            inclination: 35.6,
-            status: "active" as const
-          },
-          {
-            id: "sat-003",
-            name: "CommRelay-7",
-            type: "Communications",
-            altitude: 780,
-            velocity: 27300,
-            inclination: 45.1,
-            status: "warning" as const
-          },
-          {
-            id: "sat-004",
-            name: "DefenseSat-2",
-            type: "Military",
-            altitude: 410,
-            velocity: 28100,
-            inclination: 51.6,
-            status: "inactive" as const
+        // Go up the hierarchy until we find the group with userData
+        while (obj && !obj.userData?.id) {
+          obj = obj.parent;
+        }
+        
+        if (obj && obj.userData?.id) {
+          const satelliteId = obj.userData.id;
+          const satellite = satelliteList.find(sat => sat.id === satelliteId);
+          
+          if (satellite) {
+            // Highlight selected satellite
+            highlightSatellite(satelliteId);
+            onSatelliteSelect(satellite);
           }
-        ];
-        
-        // Highlight selected satellite
-        satellites.forEach((sat, i) => {
-          if (i === index) {
-            (sat.material as THREE.MeshPhongMaterial).emissiveIntensity = 1.0;
-          } else {
-            (sat.material as THREE.MeshPhongMaterial).emissiveIntensity = 0.5;
-          }
-        });
-        
-        onSatelliteSelect(mockSatellites[index % mockSatellites.length]);
+        }
       }
     };
     
@@ -392,12 +395,53 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
     
     window.addEventListener('resize', handleResize);
     
-    // Trail position arrays
-    const trailPositionsArrays = trails.map(() => []);
+    // Function to highlight a selected satellite
+    const highlightSatellite = (id: string | undefined) => {
+      Object.entries(satelliteObjects).forEach(([satId, satObj]) => {
+        const isSelected = satId === id;
+        
+        // Find the satellite mesh (first child)
+        const satMesh = satObj.children[0] as THREE.Mesh;
+        if (satMesh) {
+          // Update material properties based on selection
+          const material = satMesh.material as THREE.MeshPhongMaterial;
+          material.emissiveIntensity = isSelected ? 1.0 : 0.5;
+          
+          // Find and update the glow effect
+          if (satMesh.children.length > 0) {
+            const glowMesh = satMesh.children[0] as THREE.Mesh;
+            const glowMaterial = glowMesh.material as THREE.MeshBasicMaterial;
+            
+            if (isSelected) {
+              glowMaterial.opacity = 0.9;
+              const scale = isSelected ? 1.8 : 1.0;
+              glowMesh.scale.set(scale, scale, scale);
+            } else {
+              const satData = satelliteList.find(sat => sat.id === satId);
+              if (satData) {
+                glowMaterial.opacity = statusEffectMap[satData.status]?.opacity || 0.5;
+              }
+              glowMesh.scale.set(1, 1, 1);
+            }
+          }
+          
+          // Scale the satellite up if selected
+          satMesh.scale.set(
+            isSelected ? 1.5 : 1.0,
+            isSelected ? 1.5 : 1.0,
+            isSelected ? 1.5 : 1.0
+          );
+        }
+      });
+    };
+    
+    // Animation variables
+    const clock = new THREE.Clock();
     
     // Animation loop with improved effects
     const animate = () => {
       requestAnimationFrame(animate);
+      const elapsedTime = clock.getElapsedTime();
       
       if (autoRotate) {
         earth.rotation.y += 0.0005;
@@ -410,47 +454,46 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
         camera.position, glow.position
       );
       
-      // Update satellite positions and trails
-      satelliteData.forEach((data, index) => {
-        const satellite = satellites[index];
-        const trail = trails[index];
-        const trailPositions = trailPositionsArrays[index] as THREE.Vector3[];
-        
-        const time = performance.now() * data.speed * 0.001;
-        
-        // Calculate new satellite position
-        const x = data.distance * Math.cos(time);
-        const z = data.distance * Math.sin(time);
-        const y = Math.sin(time) * Math.sin(data.inclination) * data.distance;
-        
-        satellite.position.set(x, y, z);
-        
-        // Update trail
-        if (trailPositions.length >= data.trailLength) {
-          trailPositions.shift();
+      // Animate satellites
+      satelliteList.forEach((satData) => {
+        const satObj = satelliteObjects[satData.id];
+        if (satObj) {
+          // Get the main satellite mesh
+          const satMesh = satObj.children[0] as THREE.Mesh;
+          
+          if (satMesh && satMesh.children.length > 0) {
+            // Update glow ping effect
+            const glowMesh = satMesh.children[0] as THREE.Mesh;
+            const pingMesh = satMesh.children[1] as THREE.Mesh;
+            
+            // Pulse effect based on status
+            const statusEffect = statusEffectMap[satData.status] || { opacity: 0.5, pulseSpeed: 0.5 };
+            const pulseFactor = Math.sin(elapsedTime * statusEffect.pulseSpeed) * 0.2 + 0.8;
+            
+            if (glowMesh) {
+              const glowMaterial = glowMesh.material as THREE.MeshBasicMaterial;
+              glowMaterial.opacity = statusEffect.opacity * pulseFactor;
+            }
+            
+            // Scale ping for pulse effect
+            if (pingMesh) {
+              const pingScale = 1.0 + Math.sin(elapsedTime * statusEffect.pulseSpeed * 2) * 0.5;
+              pingMesh.scale.set(pingScale, pingScale, pingScale);
+            }
+          }
         }
-        
-        trailPositions.push(new THREE.Vector3(x, y, z));
-        
-        // Update trail geometry
-        const trailGeometry = trail.geometry as THREE.BufferGeometry;
-        const positions = trailGeometry.attributes.position.array as Float32Array;
-        
-        for (let i = 0; i < trailPositions.length; i++) {
-          const i3 = i * 3;
-          positions[i3] = trailPositions[i].x;
-          positions[i3 + 1] = trailPositions[i].y;
-          positions[i3 + 2] = trailPositions[i].z;
-        }
-        
-        trailGeometry.setDrawRange(0, trailPositions.length);
-        trailGeometry.attributes.position.needsUpdate = true;
       });
       
       renderer.render(scene, camera);
     };
     
+    // Start animation
     animate();
+    
+    // Apply initial highlight if a satellite is selected
+    if (selectedSatelliteId) {
+      highlightSatellite(selectedSatelliteId);
+    }
     
     // Cleanup
     return () => {
@@ -474,19 +517,62 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
       glowGeometry.dispose();
       glowMaterial.dispose();
       
-      satellites.forEach(satellite => {
+      Object.values(satelliteObjects).forEach(satellite => {
         scene.remove(satellite);
-        satellite.geometry.dispose();
-        (satellite.material as THREE.Material).dispose();
-      });
-      
-      trails.forEach(trail => {
-        scene.remove(trail);
-        trail.geometry.dispose();
-        (trail.material as THREE.Material).dispose();
+        // Dispose geometry and materials recursively
+        satellite.traverse((child) => {
+          if ((child as THREE.Mesh).geometry) {
+            (child as THREE.Mesh).geometry.dispose();
+          }
+          
+          if ((child as THREE.Mesh).material) {
+            const material = (child as THREE.Mesh).material;
+            if (Array.isArray(material)) {
+              material.forEach(mat => mat.dispose());
+            } else {
+              material.dispose();
+            }
+          }
+        });
       });
     };
-  }, [onSatelliteSelect]);
+  }, [onSatelliteSelect, selectedSatelliteId]);
+  
+  // Highlight selected satellite if ID changes
+  useEffect(() => {
+    if (selectedSatelliteId) {
+      const satelliteObjects = satelliteObjectsRef.current;
+      Object.entries(satelliteObjects).forEach(([satId, satObj]) => {
+        const isSelected = satId === selectedSatelliteId;
+        const satMesh = satObj.children[0] as THREE.Mesh;
+        
+        if (satMesh) {
+          // Update material properties based on selection
+          const material = satMesh.material as THREE.MeshPhongMaterial;
+          material.emissiveIntensity = isSelected ? 1.0 : 0.5;
+          
+          // Scale the satellite up if selected
+          satMesh.scale.set(
+            isSelected ? 1.5 : 1.0,
+            isSelected ? 1.5 : 1.0,
+            isSelected ? 1.5 : 1.0
+          );
+          
+          // Find and update the glow effect
+          if (satMesh.children.length > 0) {
+            const glowMesh = satMesh.children[0] as THREE.Mesh;
+            const glowMaterial = glowMesh.material as THREE.MeshBasicMaterial;
+            
+            if (isSelected) {
+              glowMaterial.opacity = 0.9;
+              const scale = isSelected ? 1.8 : 1.0;
+              glowMesh.scale.set(scale, scale, scale);
+            }
+          }
+        }
+      });
+    }
+  }, [selectedSatelliteId]);
   
   return (
     <div ref={containerRef} className="w-full h-full relative">
@@ -498,6 +584,10 @@ const Globe = ({ onSatelliteSelect }: GlobeProps) => {
       <div className="absolute inset-0 pointer-events-none rounded-lg" style={{
         boxShadow: 'inset 0 0 50px rgba(76, 201, 240, 0.3)'
       }}></div>
+      <div className="absolute bottom-4 left-4 text-xs text-space-accent bg-black/30 p-2 rounded">
+        <div>Globe Controls: Click + Drag to rotate</div>
+        <div>Click on any satellite to view details</div>
+      </div>
     </div>
   );
 };
