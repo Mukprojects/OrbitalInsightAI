@@ -2,6 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Calendar, Clock, AlertTriangle, MapPin, Users, Filter, Search, Plus, ExternalLink } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 const EventsView = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -17,7 +18,8 @@ const EventsView = () => {
       details: "SpaceX Falcon 9 launch of communication satellites",
       organization: "SpaceX",
       impact: "Network expansion",
-      status: "scheduled"
+      status: "scheduled",
+      tracked: false
     },
     {
       id: "evt-002",
@@ -29,7 +31,8 @@ const EventsView = () => {
       details: "Class M2 solar flare detected, potential communications disruption",
       organization: "NOAA Space Weather",
       impact: "Possible radio blackouts",
-      status: "monitoring"
+      status: "monitoring",
+      tracked: false
     },
     {
       id: "evt-003",
@@ -41,7 +44,8 @@ const EventsView = () => {
       details: "Close approach between defunct satellite and debris cluster",
       organization: "Space Debris Monitor",
       impact: "Collision risk assessment",
-      status: "active"
+      status: "active",
+      tracked: true
     },
     {
       id: "evt-004",
@@ -53,7 +57,8 @@ const EventsView = () => {
       details: "Thermal anomaly detected in remote forested area",
       organization: "Forest Service",
       impact: "Early warning system triggered",
-      status: "active"
+      status: "active",
+      tracked: false
     },
     {
       id: "evt-005",
@@ -65,7 +70,8 @@ const EventsView = () => {
       details: "Scheduled software update and orbital adjustments",
       organization: "Global Space Agency",
       impact: "Brief service interruption",
-      status: "scheduled"
+      status: "scheduled",
+      tracked: false
     },
     {
       id: "evt-006",
@@ -77,7 +83,8 @@ const EventsView = () => {
       details: "Flood monitoring and relief coordination",
       organization: "UN OCHA",
       impact: "Aid distribution planning",
-      status: "active"
+      status: "active",
+      tracked: false
     },
     {
       id: "evt-007",
@@ -89,7 +96,8 @@ const EventsView = () => {
       details: "Seasonal melt pattern analysis",
       organization: "Climate Research Institute",
       impact: "Climate model input",
-      status: "scheduled"
+      status: "scheduled",
+      tracked: false
     },
     {
       id: "evt-008",
@@ -101,7 +109,8 @@ const EventsView = () => {
       details: "Unusual vessel movement patterns detected",
       organization: "Maritime Security Agency",
       impact: "Commercial shipping advisory",
-      status: "active"
+      status: "active",
+      tracked: false
     }
   ];
   
@@ -156,6 +165,40 @@ const EventsView = () => {
   const filteredEvents = selectedCategory 
     ? events.filter(event => event.category === selectedCategory)
     : events;
+
+  const handleTrackEvent = (id: string) => {
+    const event = events.find(e => e.id === id);
+    if (event) {
+      event.tracked = !event.tracked;
+      if (event.tracked) {
+        toast.success(`Now tracking: ${event.type}`, {
+          description: `Priority: ${event.priority.toUpperCase()}, Status: ${event.status}`,
+        });
+      } else {
+        toast.info(`Stopped tracking: ${event.type}`);
+      }
+    }
+  };
+
+  const handleViewDetails = (event: any) => {
+    toast.info(`Viewing details for: ${event.type}`, {
+      description: `${event.details}`,
+      duration: 5000,
+    });
+  };
+
+  const handleRespond = (event: any) => {
+    toast.success(`Response initiated for: ${event.type}`, {
+      description: `Contacting: ${event.organization}`,
+      duration: 5000,
+    });
+  };
+
+  const handleCreateNewEvent = () => {
+    toast.info("Opening event creation form", {
+      description: "Please fill in all required fields to create a new event",
+    });
+  };
 
   return (
     <div className="grid-pattern h-full flex flex-col">
@@ -229,7 +272,9 @@ const EventsView = () => {
               </div>
               
               <div className="pt-4 mt-4">
-                <button className="flex items-center justify-center w-full bg-space-bright-blue hover:bg-space-blue text-white py-2 rounded text-sm transition-colors">
+                <button 
+                  onClick={handleCreateNewEvent}
+                  className="flex items-center justify-center w-full bg-space-bright-blue hover:bg-space-blue text-white py-2 rounded text-sm transition-colors">
                   <Plus className="h-4 w-4 mr-1" />
                   Create New Event
                 </button>
@@ -316,16 +361,22 @@ const EventsView = () => {
                     </div>
                     
                     <div className="flex justify-between">
-                      <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs flex items-center">
+                      <button 
+                        onClick={() => handleViewDetails(event)}
+                        className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs flex items-center">
                         <span>Details</span>
                         <ExternalLink className="h-3 w-3 ml-1" />
                       </button>
                       
                       <div className="space-x-1">
-                        <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs">
-                          Track
+                        <button 
+                          onClick={() => handleTrackEvent(event.id)}
+                          className={`${event.tracked ? 'bg-space-accent text-space-dark-blue' : 'bg-muted/30 hover:bg-muted/40'} px-2 py-1 rounded text-xs`}>
+                          {event.tracked ? 'Tracking' : 'Track'}
                         </button>
-                        <button className="bg-space-bright-blue hover:bg-space-blue text-white px-2 py-1 rounded text-xs">
+                        <button 
+                          onClick={() => handleRespond(event)}
+                          className="bg-space-bright-blue hover:bg-space-blue text-white px-2 py-1 rounded text-xs">
                           Respond
                         </button>
                       </div>

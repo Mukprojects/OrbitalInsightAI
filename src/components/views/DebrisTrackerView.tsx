@@ -4,10 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { AlertTriangle, Shield, Search, Filter, ArrowRight } from "lucide-react";
 import Globe from "../Globe";
 import { Progress } from "../ui/progress";
+import { toast } from "sonner";
 
 const DebrisTrackerView = () => {
   const [debrisCount, setDebrisCount] = useState(157);
   const [criticalAlerts, setCriticalAlerts] = useState(3);
+  const [selectedDebris, setSelectedDebris] = useState<string | null>(null);
   
   const debrisList = [
     {
@@ -18,7 +20,8 @@ const DebrisTrackerView = () => {
       altitude: 620,
       risk: "high",
       origin: "Defunct Satellite",
-      lastUpdated: "2 hours ago"
+      lastUpdated: "2 hours ago",
+      tracked: false
     },
     {
       id: "deb-002",
@@ -28,7 +31,8 @@ const DebrisTrackerView = () => {
       altitude: 540,
       risk: "high",
       origin: "Launch Vehicle",
-      lastUpdated: "4 hours ago"
+      lastUpdated: "4 hours ago",
+      tracked: true
     },
     {
       id: "deb-003",
@@ -38,7 +42,8 @@ const DebrisTrackerView = () => {
       altitude: 710,
       risk: "medium",
       origin: "Satellite Collision",
-      lastUpdated: "1 day ago"
+      lastUpdated: "1 day ago",
+      tracked: false
     },
     {
       id: "deb-004",
@@ -48,7 +53,8 @@ const DebrisTrackerView = () => {
       altitude: 680,
       risk: "low",
       origin: "Unknown",
-      lastUpdated: "3 days ago"
+      lastUpdated: "3 days ago",
+      tracked: false
     },
     {
       id: "deb-005",
@@ -58,7 +64,8 @@ const DebrisTrackerView = () => {
       altitude: 590,
       risk: "medium",
       origin: "Astronaut Activity",
-      lastUpdated: "2 days ago"
+      lastUpdated: "2 days ago",
+      tracked: false
     }
   ];
 
@@ -78,6 +85,39 @@ const DebrisTrackerView = () => {
       case "low": return "text-space-success";
       default: return "text-muted-foreground";
     }
+  };
+
+  const handleTrackDebris = (id: string) => {
+    const debris = debrisList.find(d => d.id === id);
+    if (debris) {
+      debris.tracked = !debris.tracked;
+      if (debris.tracked) {
+        toast.success(`Now tracking: ${debris.name}`, {
+          description: `At altitude: ${debris.altitude}km`,
+        });
+      } else {
+        toast.info(`Stopped tracking: ${debris.name}`);
+      }
+      setSelectedDebris(id);
+    }
+  };
+
+  const handleDebrisDetails = (id: string) => {
+    const debris = debrisList.find(d => d.id === id);
+    if (debris) {
+      toast.info(`Debris Details: ${debris.name}`, {
+        description: `Origin: ${debris.origin}, Risk Level: ${debris.risk.toUpperCase()}`,
+        duration: 5000,
+      });
+      setSelectedDebris(id);
+    }
+  };
+
+  const handleViewCollisionScenario = () => {
+    toast.success("Loading collision scenario simulation", {
+      description: "AI collision avoidance recommendations being generated",
+      duration: 5000,
+    });
   };
 
   return (
@@ -166,7 +206,9 @@ const DebrisTrackerView = () => {
                     <div className="text-muted-foreground">Satellite orbit adjustment required</div>
                   </div>
                   <div className="flex justify-end">
-                    <button className="bg-space-blue text-white px-4 py-2 rounded-md text-sm hover:bg-space-bright-blue transition-colors flex items-center">
+                    <button 
+                      onClick={handleViewCollisionScenario}
+                      className="bg-space-blue text-white px-4 py-2 rounded-md text-sm hover:bg-space-bright-blue transition-colors flex items-center">
                       <span>View Collision Scenario</span>
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </button>
@@ -195,7 +237,10 @@ const DebrisTrackerView = () => {
             <CardContent className="h-[calc(100%-56px)] overflow-y-auto">
               <div className="space-y-3">
                 {debrisList.map(debris => (
-                  <div key={debris.id} className="bg-muted/20 rounded-md p-3">
+                  <div 
+                    key={debris.id} 
+                    className={`bg-muted/20 rounded-md p-3 ${selectedDebris === debris.id ? 'border border-space-accent' : ''}`}
+                  >
                     <div className="flex justify-between mb-2">
                       <div className="font-medium">{debris.name}</div>
                       <div className={`text-xs ${getRiskColor(debris.risk)}`}>
@@ -227,10 +272,15 @@ const DebrisTrackerView = () => {
                     </div>
                     
                     <div className="mt-2 flex space-x-2">
-                      <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs transition-colors">
-                        Track
+                      <button
+                        onClick={() => handleTrackDebris(debris.id)}
+                        className={`${debris.tracked ? 'bg-space-accent text-space-dark-blue' : 'bg-muted/30 hover:bg-muted/40'} px-2 py-1 rounded text-xs transition-colors`}
+                      >
+                        {debris.tracked ? 'Tracking' : 'Track'}
                       </button>
-                      <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs transition-colors">
+                      <button 
+                        onClick={() => handleDebrisDetails(debris.id)}
+                        className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded text-xs transition-colors">
                         Details
                       </button>
                     </div>

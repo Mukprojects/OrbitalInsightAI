@@ -2,6 +2,7 @@
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
+import { toast } from "sonner";
 
 interface SatelliteInfoProps {
   satellite: {
@@ -60,6 +61,13 @@ const SatelliteInfo = ({ satellite }: SatelliteInfoProps) => {
     }
   };
 
+  const handleViewTelemetry = () => {
+    toast.success(`Accessing telemetry for ${satellite.name}`, {
+      description: `ID: ${satellite.id}, Type: ${satellite.type}`,
+      duration: 5000,
+    });
+  };
+
   return (
     <Card className="card-gradient">
       <CardHeader className="pb-2">
@@ -110,7 +118,9 @@ const SatelliteInfo = ({ satellite }: SatelliteInfoProps) => {
           </div>
 
           <div className="pt-2">
-            <button className="w-full bg-space-bright-blue hover:bg-space-blue text-white py-1 px-2 rounded text-sm transition-colors">
+            <button 
+              onClick={handleViewTelemetry}
+              className="w-full bg-space-bright-blue hover:bg-space-blue text-white py-1 px-2 rounded text-sm transition-colors">
               View Detailed Telemetry
             </button>
           </div>

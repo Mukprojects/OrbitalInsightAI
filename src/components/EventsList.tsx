@@ -1,45 +1,52 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Bell, Calendar, MapPin } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
 
 const EventsList = () => {
-  const events = [
+  const [events, setEvents] = useState([
     {
       id: 1,
       type: "Satellite Launch",
       time: "2024-05-05T14:30:00Z",
       location: "Kennedy Space Center, FL",
-      priority: "high"
+      priority: "high",
+      tracked: false
     },
     {
       id: 2,
       type: "Solar Flare Warning",
       time: "2024-05-06T09:15:00Z",
       location: "Global",
-      priority: "medium"
+      priority: "medium",
+      tracked: false
     },
     {
       id: 3,
       type: "Debris Near Miss",
       time: "2024-05-05T20:45:00Z",
       location: "LEO Orbit, 570km",
-      priority: "high"
+      priority: "high",
+      tracked: true
     },
     {
       id: 4,
       type: "Wildfire Detection",
       time: "2024-05-05T12:10:00Z",
       location: "Northern California",
-      priority: "medium"
+      priority: "medium",
+      tracked: false
     },
     {
       id: 5,
       type: "Satellite Maintenance",
       time: "2024-05-07T08:00:00Z",
       location: "GlobalSat-1",
-      priority: "low"
+      priority: "low",
+      tracked: false
     }
-  ];
+  ]);
 
   const formatTime = (timeStr: string) => {
     const date = new Date(timeStr);
@@ -63,6 +70,28 @@ const EventsList = () => {
       default:
         return "bg-muted/20 text-muted-foreground border-muted/50";
     }
+  };
+
+  const handleTrack = (id: number) => {
+    setEvents(prevEvents => 
+      prevEvents.map(event => 
+        event.id === id ? { ...event, tracked: !event.tracked } : event
+      )
+    );
+    const event = events.find(e => e.id === id);
+    if (event) {
+      if (!event.tracked) {
+        toast.success(`Now tracking: ${event.type}`);
+      } else {
+        toast.info(`Stopped tracking: ${event.type}`);
+      }
+    }
+  };
+
+  const handleViewDetails = (event: any) => {
+    toast.info(`Viewing details for: ${event.type}`, {
+      description: `Location: ${event.location}, Time: ${formatTime(event.time)}`
+    });
   };
 
   return (
@@ -90,11 +119,15 @@ const EventsList = () => {
                 {event.location}
               </div>
               <div className="mt-2 text-xs">
-                <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded transition-colors mr-1">
+                <button 
+                  onClick={() => handleViewDetails(event)}
+                  className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded transition-colors mr-1">
                   Details
                 </button>
-                <button className="bg-muted/30 hover:bg-muted/40 px-2 py-1 rounded transition-colors">
-                  Track
+                <button 
+                  onClick={() => handleTrack(event.id)}
+                  className={`${event.tracked ? 'bg-space-accent text-space-dark-blue' : 'bg-muted/30 hover:bg-muted/40'} px-2 py-1 rounded transition-colors`}>
+                  {event.tracked ? 'Tracking' : 'Track'}
                 </button>
               </div>
             </div>
