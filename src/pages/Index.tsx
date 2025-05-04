@@ -1,12 +1,30 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { useEffect } from "react";
+import { Toaster } from "sonner";
+import Dashboard from "../components/Dashboard";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/Sidebar";
+import StatusBar from "../components/StatusBar";
 
 const Index = () => {
+  useEffect(() => {
+    document.body.classList.add("overflow-hidden");
+    return () => {
+      document.body.classList.remove("overflow-hidden");
+    };
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-space-dark-blue text-foreground">
+      <Toaster position="top-right" richColors closeButton />
+      <Navbar />
+      <div className="flex flex-1 overflow-hidden">
+        <Sidebar />
+        <main className="flex-1 overflow-hidden bg-space-gradient">
+          <Dashboard />
+        </main>
       </div>
+      <StatusBar />
     </div>
   );
 };
