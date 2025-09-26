@@ -1,0 +1,276 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  username    String   @unique
+  password    String
+  firstName   String?
+  lastName    String?
+  role        String   @default("USER") // USER, ADMIN, ANALYST, RESEARCHER
+  isActive    Boolean  @default(true)
+  lastLogin   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // User preferences and settings
+  preferences UserPreferences?
+  
+  // User's tracked satellites and alerts
+  trackedSatellites UserSatelliteTracking[]
+  alerts           Alert[]
+  sessions         UserSession[]
+  
+  @@map("users")
+}
+
+model UserPreferences {
+  id                String  @id @default(cuid())
+  userId            String  @unique
+  theme             String  @default("dark")
+  notifications     Boolean @default(true)
+  emailAlerts       Boolean @default(false)
+  defaultView       String  @default("dashboard")
+  trackingRadius    Float   @default(1000.0) // km
+  alertThreshold    Float   @default(0.1)    // collision probability threshold
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_preferences")
+}
+
+model UserSession {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("user_sessions")
+}
+
+model Satellite {
+  id              String           @id @default(cuid())
+  noradId         Int              @unique // NORAD catalog number
+  name            String
+  commonName      String?
+  type            String           // EARTH_OBSERVATION, COMMUNICATION, etc.
+  country         String?
+  owner           String?
+  launchDate      DateTime?
+  decayDate       DateTime?
+  period          Float?           // orbital period in minutes
+  inclination     Float?           // degrees
+  apogee          Float?           // km
+  perigee         Float?           // km
+  rcs             Float?           // radar cross section
+  status          String           @default("ACTIVE") // ACTIVE, INACTIVE, etc.
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  // TLE data
+  tleData         TleData[]
+  
+  // Position history
+  positions       SatellitePosition[]
+  
+  // Collision predictions
+  collisionRisks  CollisionRisk[]
+  
+  // User tracking
+  trackedBy       UserSatelliteTracking[]
+  
+  // Events
+  events          SatelliteEvent[]
+  
+  @@map("satellites")
+}
+
+model TleData {
+  id          String    @id @default(cuid())
+  satelliteId String
+  line0       String    // Satellite name
+  line1       String    // First line of TLE
+  line2       String    // Second line of TLE
+  epoch       DateTime  // TLE epoch
+  isLatest    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  
+  satellite Satellite @relation(fields: [satelliteId], references: [id], onDelete: Cascade)
+  
+  @@map("tle_data")
+}
+
+model SatellitePosition {
+  id          String    @id @default(cuid())
+  satelliteId String
+  latitude    Float
+  longitude   Float
+  altitude    Float     // km above Earth
+  velocity    Float     // km/s
+  timestamp   DateTime
+  
+  satellite Satellite @relation(fields: [satelliteId], references: [id], onDelete: Cascade)
+  
+  @@map("satellite_positions")
+}
+
+model CollisionRisk {
+  id               String    @id @default(cuid())
+  primarySatId     String
+  secondaryObjId   String?   // Could be another satellite or debris
+  secondaryObjName String?
+  probability      Float     // 0.0 to 1.0
+  timeOfClosest    DateTime  // When closest approach occurs
+  missDistance     Float     // km
+  riskLevel        String    // LOW, MEDIUM, HIGH, CRITICAL
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  primarySatellite Satellite @relation(fields: [primarySatId], references: [id])
+  
+  @@map("collision_risks")
+}
+
+model SpaceWeather {
+  id                String   @id @default(cuid())
+  timestamp         DateTime
+  solarFluxIndex    Float?   // Solar flux at 10.7 cm
+  geomagneticIndex  Float?   // Kp index
+  solarWindSpeed    Float?   // km/s
+  protonFlux        Float?   // particles/cm²/s
+  electronFlux      Float?   // particles/cm²/s
+  xrayFlux          Float?   // W/m²
+  alertLevel        String   @default("GREEN") // GREEN, YELLOW, ORANGE, RED
+  description       String?
+  
+  @@map("space_weather")
+}
+
+model SatelliteEvent {
+  id          String      @id @default(cuid())
+  satelliteId String
+  type        String      // LAUNCH, DECAY, MANEUVER, etc.
+  title       String
+  description String?
+  severity    String      // INFO, WARNING, ERROR, CRITICAL
+  timestamp   DateTime
+  metadata    String?     // JSON string for additional event-specific data
+  isResolved  Boolean     @default(false)
+  
+  satellite Satellite @relation(fields: [satelliteId], references: [id])
+  
+  @@map("satellite_events")
+}
+
+model UserSatelliteTracking {
+  id          String   @id @default(cuid())
+  userId      String
+  satelliteId String
+  isActive    Boolean  @default(true)
+  addedAt     DateTime @default(now())
+  
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  satellite Satellite @relation(fields: [satelliteId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, satelliteId])
+  @@map("user_satellite_tracking")
+}
+
+model Alert {
+  id          String      @id @default(cuid())
+  userId      String
+  type        String      // COLLISION_RISK, SATELLITE_ANOMALY, etc.
+  title       String
+  message     String
+  severity    String      // LOW, MEDIUM, HIGH, CRITICAL
+  isRead      Boolean     @default(false)
+  metadata    String?     // JSON string for alert-specific data
+  createdAt   DateTime    @default(now())
+  readAt      DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("alerts")
+}
+
+model DebrisObject {
+  id              String    @id @default(cuid())
+  noradId         Int?      @unique
+  name            String
+  type            String    // ROCKET_BODY, PAYLOAD, etc.
+  size            Float?    // estimated size in meters
+  mass            Float?    // estimated mass in kg
+  lastObserved    DateTime?
+  decayPrediction DateTime?
+  rcs             Float?    // radar cross section
+  isTracked       Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Position data
+  positions       DebrisPosition[]
+  
+  @@map("debris_objects")
+}
+
+model DebrisPosition {
+  id        String       @id @default(cuid())
+  debrisId  String
+  latitude  Float
+  longitude Float
+  altitude  Float        // km above Earth
+  velocity  Float        // km/s
+  timestamp DateTime
+  
+  debris DebrisObject @relation(fields: [debrisId], references: [id], onDelete: Cascade)
+  
+  @@map("debris_positions")
+}
+
+model LaunchEvent {
+  id           String     @id @default(cuid())
+  name         String
+  launchDate   DateTime
+  rocket       String?
+  launchSite   String?
+  mission      String?
+  status       String     // SCHEDULED, DELAYED, LAUNCHED, etc.
+  payloads     String?    // JSON string array of satellite names/IDs
+  description  String?
+  liveStream   String?    // URL to live stream
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  
+  @@map("launch_events")
+}
+
+model Analytics {
+  id              String   @id @default(cuid())
+  date            DateTime @unique
+  totalSatellites Int      @default(0)
+  activeSatellites Int     @default(0)
+  totalDebris     Int      @default(0)
+  collisionRisks  Int      @default(0)
+  spaceWeatherEvents Int   @default(0)
+  userSessions    Int      @default(0)
+  apiCalls        Int      @default(0)
+  
+  @@map("analytics")
+}
