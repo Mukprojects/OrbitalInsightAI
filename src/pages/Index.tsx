@@ -1,5 +1,6 @@
 
 import { useEffect } from "react";
+import { Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import Dashboard from "../components/Dashboard";
 import Navbar from "../components/Navbar";
@@ -7,10 +8,42 @@ import Sidebar from "../components/Sidebar";
 import StatusBar from "../components/StatusBar";
 import { ViewProvider } from "../contexts/ViewContext";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { useAuth } from "../hooks/useAuth";
+import useWebSocket, { useAlertNotifications, useSpaceWeatherUpdates, useHeartbeat } from "../hooks/useWebSocket";
+import { Loader2 } from "lucide-react";
 
 const Index = () => {
-  // We're removing the overflow-hidden from the body to allow proper scrolling
-  // Instead, we'll handle overflow within our components
+  const { isAuthenticated, isLoading } = useAuth();
+  const { connect, isConnected, connectionState } = useWebSocket();
+  
+  // Initialize WebSocket connection and real-time features
+  useAlertNotifications(); // This will show toast notifications for alerts
+  useSpaceWeatherUpdates(); // This will show weather alerts
+  const heartbeat = useHeartbeat(); // Connection monitoring
+
+  useEffect(() => {
+    if (isAuthenticated && !isConnected) {
+      connect().catch(console.error);
+    }
+  }, [isAuthenticated, isConnected, connect]);
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-space-dark-blue">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-space-accent" />
+          <p className="text-white text-xl font-space">Loading Orbital Insight AI...</p>
+          <p className="text-space-accent mt-2">Initializing satellite telemetry systems</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <ViewProvider>
@@ -25,7 +58,10 @@ const Index = () => {
             </main>
           </ScrollArea>
         </div>
-        <StatusBar />
+        <StatusBar 
+          connectionState={connectionState}
+          heartbeat={heartbeat}
+        />
       </div>
     </ViewProvider>
   );
